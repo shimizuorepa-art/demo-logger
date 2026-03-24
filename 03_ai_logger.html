@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+<title>現場メモ 一言報告 - 豊橋鉄道</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    background:#FFFFFF;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:48px 24px 80px;
+    overflow-x:hidden;
+  }
+  /* シナリオボタン — 2カラム正方形グリッド（フレーム内） */
+  .scenario-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:12px;
+    padding:0 16px 16px;
+  }
+  .scenario-card {
+    aspect-ratio:1; border-radius:18px;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:8px;
+    cursor:pointer; border:2px solid #e2e8f0;
+    background:#fff; transition:all 0.15s;
+    padding:14px 10px; text-align:center;
+    box-shadow:0 1px 4px rgba(0,0,0,0.04);
+  }
+  .scenario-card:active { transform:scale(0.96); border-color:#93c5fd; background:#eff6ff; }
+  .scenario-card .sc-icon {
+    width:52px; height:52px; border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:26px;
+  }
+  .scenario-card.lost .sc-icon       { background:#dbeafe; }
+  .scenario-card.damage .sc-icon     { background:#dcfce7; }
+  .scenario-card.light .sc-icon      { background:#fef3c7; }
+  .scenario-card.suspicious .sc-icon { background:#fee2e2; }
+  .scenario-card .sc-label { font-size:13px; font-weight:700; color:#334155; }
+  .scenario-card .sc-sub { font-size:10px; color:#94a3b8; line-height:1.3; }
+  .scenario-card.suspicious { border-color:rgba(239,68,68,0.25); }
+  .scenario-card.suspicious:active { border-color:#fca5a5; background:#fef2f2; }
+  .scenario-header {
+    grid-column:1/-1; font-size:11px; font-weight:700; color:#94a3b8;
+    text-align:center; letter-spacing:0.05em; padding:4px 0 2px;
+  }
+
+  /* HEADER */
+  .header {
+    background:#1a365d; color:#fff;
+    padding:13px 20px;
+    display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:100;
+  }
+  .header-left { display:flex; align-items:center; gap:10px; }
+  .header h1 { font-size:16px; font-weight:700; }
+  .header-badge {
+    background:rgba(255,255,255,0.15); padding:4px 10px;
+    border-radius:6px; font-size:11px; font-weight:600; white-space:nowrap;
+  }
+
+  /* TABS */
+  .tabs {
+    display:flex; background:#fff;
+    border-bottom:2px solid #f1f5f9;
+    position:sticky; top:50px; z-index:99;
+  }
+  .tab {
+    flex:1; padding:12px 8px; min-height:48px;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    font-size:13px; font-weight:700; color:#94a3b8;
+    cursor:pointer; border:none; background:none;
+    font-family:inherit; border-bottom:3px solid transparent;
+    transition:all 0.2s; margin-bottom:-2px;
+  }
+  .tab.active { color:#1a365d; border-bottom-color:#1a365d; }
+  .tab svg { opacity:0.5; transition:opacity 0.2s; }
+  .tab.active svg { opacity:1; }
+
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+
+  /* REPORT TAB */
+  .report-tab { padding:20px 20px 40px; background:#f8fafc; min-height:100%; }
+
+  .camera-area {
+    background:#1e293b; border-radius:20px;
+    min-height:220px; margin-bottom:16px;
+    cursor:pointer; transition:all 0.2s;
+    position:relative; overflow:hidden;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:6px;
+    padding:20px 16px;
+  }
+  .camera-area:active { transform:scale(0.99); }
+  .camera-icon { color:rgba(255,255,255,0.25); }
+  .camera-text { color:rgba(255,255,255,0.7); font-size:15px; font-weight:700; }
+  .camera-sub  { color:rgba(255,255,255,0.35); font-size:12px; }
+
+  /* Preview */
+  .camera-preview {
+    position:absolute; inset:0;
+    display:none; align-items:center; justify-content:center; background:#000;
+  }
+  .camera-preview.show { display:flex; }
+  .camera-preview img { max-width:100%; max-height:100%; object-fit:contain; }
+  .preview-overlay {
+    position:absolute; bottom:0; left:0; right:0;
+    background:linear-gradient(transparent,rgba(0,0,0,0.8));
+    padding:14px 16px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .preview-label { color:#fff; font-size:13px; font-weight:600; }
+  .retake-btn {
+    background:rgba(255,255,255,0.2); color:#fff;
+    border:1px solid rgba(255,255,255,0.3); padding:8px 16px;
+    border-radius:8px; font-size:13px; font-family:inherit; cursor:pointer;
+  }
+
+  /* Demo buttons inside camera area */
+  .demo-images {
+    display:flex; gap:8px; width:100%; padding:0 4px; position:relative; z-index:1;
+  }
+  .demo-img-btn {
+    flex:1; padding:12px 6px;
+    background:rgba(255,255,255,0.07);
+    border:1.5px solid rgba(255,255,255,0.15);
+    border-radius:12px; color:#fff; font-family:inherit;
+    cursor:pointer; text-align:center; transition:all 0.2s; min-height:64px;
+  }
+  .demo-img-btn:active { border-color:#60a5fa; background:rgba(255,255,255,0.14); }
+  .demo-img-icon { margin-bottom:4px; color:rgba(255,255,255,0.6); }
+  .demo-img-label { font-size:11px; color:rgba(255,255,255,0.45); font-weight:600; }
+
+  /* AI ANALYSIS */
+  .ai-analysis {
+    background:#fff; border-radius:16px; padding:20px;
+    margin-bottom:16px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.07);
+    display:none;
+  }
+  .ai-analysis.show { display:block; }
+
+  .ai-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:14px;
+  }
+  .ai-header-left { display:flex; align-items:center; gap:8px; }
+  .ai-badge {
+    background:#1a365d; color:#fff;
+    padding:5px 12px; border-radius:20px;
+    font-size:11px; font-weight:700; letter-spacing:0.04em;
+    display:flex; align-items:center; gap:5px;
+  }
+  .ai-status { font-size:12px; color:#64748b; }
+
+  .ai-loading { display:flex; align-items:center; gap:8px; padding:8px 0; }
+  .ai-dots { display:flex; gap:4px; }
+  .ai-dot {
+    width:8px; height:8px; background:#2d5a8e; border-radius:50%;
+    animation:bounce 1.4s infinite both;
+  }
+  .ai-dot:nth-child(2) { animation-delay:.16s; }
+  .ai-dot:nth-child(3) { animation-delay:.32s; }
+  @keyframes bounce { 0%,80%,100%{transform:scale(0.6);opacity:.3} 40%{transform:scale(1);opacity:1} }
+  .ai-loading-text { font-size:13px; color:#64748b; }
+
+  .ai-result-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 0; border-bottom:1px solid #f1f5f9;
+  }
+  .ai-result-row:last-child { border:none; }
+  .ai-result-label { font-size:13px; color:#64748b; }
+  .ai-result-value { font-size:14px; font-weight:700; color:#1a1a1a; }
+  /* 編集可能フィールド */
+  .editable-field {
+    font-size:14px; font-weight:700; color:#1a1a1a;
+    border:1.5px solid transparent; border-radius:6px;
+    padding:4px 8px; background:transparent;
+    font-family:inherit; transition:all .2s;
+    text-align:right; max-width:180px;
+  }
+  .editable-field:hover { border-color:#e2e8f0; background:#f8fafc; }
+  .editable-field:focus { outline:none; border-color:#2d5a8e; background:#fff; box-shadow:0 0 0 3px rgba(27,58,107,.1); }
+  .meta-text-input {
+    flex:1; font-size:14px; color:#334155;
+    border:1.5px solid transparent; border-radius:6px;
+    padding:4px 8px; background:transparent;
+    font-family:inherit; transition:all .2s;
+  }
+  .meta-text-input:hover { border-color:#e2e8f0; background:#f8fafc; }
+  .meta-text-input:focus { outline:none; border-color:#2d5a8e; background:#fff; box-shadow:0 0 0 3px rgba(27,58,107,.1); }
+  .edit-hint {
+    font-size:9px; color:#94a3b8; background:#f1f5f9;
+    padding:1px 6px; border-radius:3px; font-weight:600; white-space:nowrap;
+  }
+  .ai-tag {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:4px 10px; border-radius:6px; font-size:12px; font-weight:700;
+  }
+  .ai-tag.lost    { background:#dbeafe; color:#1e40af; }
+  .ai-tag.damage  { background:#fed7aa; color:#9a3412; }
+  .ai-tag.urgent  { background:#fee2e2; color:#991b1b; }
+
+  /* Confidence bar */
+  .confidence-bar-wrap { flex:1; margin-left:12px; }
+  .confidence-bar-track { height:6px; background:#f1f5f9; border-radius:3px; overflow:hidden; }
+  .confidence-bar-fill {
+    height:100%; background:linear-gradient(90deg,#2d5a8e,#60a5fa);
+    border-radius:3px; transition:width 0.8s ease-out;
+  }
+  .confidence-pct { font-size:13px; font-weight:700; color:#1a365d; margin-left:8px; }
+
+  /* META */
+  .meta-section {
+    background:#fff; border-radius:16px; padding:16px 20px;
+    margin-bottom:16px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.07); display:none;
+  }
+  .meta-section.show { display:block; }
+  .meta-label {
+    font-size:11px; color:#94a3b8; text-transform:uppercase;
+    letter-spacing:0.06em; margin-bottom:10px; font-weight:700;
+  }
+  .meta-row {
+    display:flex; align-items:center; gap:10px;
+    padding:8px 0; font-size:14px; color:#334155;
+    border-bottom:1px solid #f8fafc;
+  }
+  .meta-row:last-child { border:none; padding-bottom:0; }
+  .meta-icon { width:32px; height:32px; background:#f1f5f9; border-radius:8px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#64748b; }
+  .meta-text { flex:1; }
+  .meta-auto {
+    font-size:10px; color:#16a34a; background:#dcfce7;
+    padding:2px 7px; border-radius:4px; font-weight:700; white-space:nowrap;
+  }
+
+  /* NOTE */
+  .note-area {
+    background:#fff; border-radius:16px; padding:16px 20px;
+    margin-bottom:16px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.07); display:none;
+  }
+  .note-area.show { display:block; }
+  .note-input {
+    width:100%; border:2px solid #e2e8f0; border-radius:10px;
+    padding:12px; font-size:14px; font-family:inherit;
+    resize:none; height:68px; margin-top:8px; color:#334155;
+  }
+  .note-input:focus { outline:none; border-color:#2d5a8e; }
+
+  .submit-btn {
+    width:100%; padding:16px; background:#1a365d; color:#fff;
+    border:none; border-radius:14px; font-size:16px; font-weight:700;
+    font-family:inherit; cursor:pointer; display:none; min-height:52px;
+    transition:all 0.2s;
+  }
+  .submit-btn.show { display:flex; align-items:center; justify-content:center; gap:8px; }
+  .submit-btn:active { background:#2d5a8e; transform:scale(0.98); }
+
+  /* TIMELINE TAB */
+  .timeline-tab { padding:12px 12px 40px; background:#f8fafc; }
+
+  .timeline-filter {
+    display:flex; gap:6px; margin-bottom:16px;
+    overflow-x:auto; padding:4px 0 4px;
+    scrollbar-width:none;
+  }
+  .timeline-filter::-webkit-scrollbar { display:none; }
+  .filter-chip {
+    padding:6px 14px; border-radius:20px; font-size:12px; font-weight:700;
+    border:none; cursor:pointer; white-space:nowrap;
+    font-family:inherit; background:#e2e8f0; color:#475569; transition:all 0.2s;
+  }
+  .filter-chip.active { background:#1a365d; color:#fff; }
+
+  /* TIMELINE CARDS */
+  .timeline-card {
+    background:#fff; border-radius:16px; margin-bottom:12px;
+    overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.06);
+  }
+  .tl-img-block {
+    width:100%; height:120px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:48px;
+  }
+  .tl-img-block.lost   { background:linear-gradient(135deg,#dbeafe,#bfdbfe); color:#3b82f6; }
+  .tl-img-block.damage { background:linear-gradient(135deg,#fed7aa,#fca5a5); color:#f97316; }
+  .tl-img-block.urgent { background:linear-gradient(135deg,#fee2e2,#fecaca); color:#ef4444; }
+
+  .timeline-body { padding:14px 16px; }
+  .timeline-top {
+    display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;
+  }
+  .tl-badges { display:flex; gap:4px; align-items:center; flex-wrap:wrap; }
+  .timeline-category {
+    display:inline-flex; align-items:center; gap:3px;
+    padding:3px 8px; border-radius:5px;
+    font-size:11px; font-weight:700;
+  }
+  .timeline-category.lost   { background:#dbeafe; color:#1e40af; }
+  .timeline-category.damage { background:#fed7aa; color:#9a3412; }
+  .timeline-category.urgent { background:#fee2e2; color:#991b1b; }
+  .tl-mine-badge {
+    background:#f3f4f6; color:#6b7280;
+    padding:3px 7px; border-radius:5px; font-size:10px; font-weight:700;
+  }
+  .timeline-time { font-size:11px; color:#94a3b8; white-space:nowrap; }
+  .timeline-desc { font-size:14px; font-weight:700; color:#1a1a1a; margin-bottom:6px; }
+  .timeline-meta {
+    display:flex; gap:10px; flex-wrap:wrap; font-size:12px; color:#94a3b8;
+  }
+  .timeline-meta span { display:flex; align-items:center; gap:4px; }
+  .timeline-status { display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12px; }
+  .status-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .status-dot.pending  { background:#f59e0b; }
+  .status-dot.resolved { background:#22c55e; }
+  .status-dot.urgent   { background:#ef4444; }
+
+  /* TOAST */
+  .toast {
+    position:absolute; bottom:16px; left:16px; right:16px;
+    background:#166534; color:#fff; padding:14px 20px;
+    border-radius:12px; font-size:14px; font-weight:700;
+    z-index:200; display:none;
+    box-shadow:0 4px 16px rgba(0,0,0,0.3);
+    align-items:center; gap:10px;
+  }
+  .toast.show { display:flex; animation:toastIn 0.3s ease-out; }
+  @keyframes toastIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+  .demo-badge {
+    position:absolute; top:4px; right:8px;
+    background:#ef4444; color:#fff; padding:4px 10px;
+    border-radius:6px; font-size:10px; font-weight:700; z-index:200;
+  }
+
+  /* PHONE FRAME */
+  .phone-shell {
+    width:430px; height:880px; background:#1C1C1E; border-radius:44px;
+    overflow:hidden; position:relative; flex-shrink:0;
+    box-shadow:0 0 0 1px rgba(0,0,0,.12),0 0 0 2.5px #080808,0 40px 80px rgba(0,0,0,.22),0 12px 30px rgba(0,0,0,.14);
+  }
+  .phone-shell::before {
+    content:''; position:absolute; left:-4px; top:148px;
+    width:4px; height:32px; background:#2C2C2E; border-radius:2px 0 0 2px;
+    box-shadow:0 50px 0 #2C2C2E,0 94px 0 #2C2C2E;
+  }
+  .phone-shell::after {
+    content:''; position:absolute; right:-4px; top:180px;
+    width:4px; height:68px; background:#2C2C2E; border-radius:0 2px 2px 0;
+  }
+  .phone-dynamic-island {
+    position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    width:118px; height:34px; background:#000; border-radius:17px; z-index:10;
+  }
+  .phone-screen {
+    position:absolute; top:48px; bottom:0; left:0; right:0;
+    overflow:hidden; background:#f8fafc;
+  }
+  .phone-home-bar {
+    position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+    width:134px; height:5px; background:rgba(255,255,255,.35); border-radius:3px;
+  }
+  .app-scroll {
+    position:relative; height:100%;
+    overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone-shell">
+  <div class="phone-dynamic-island"></div>
+  <div class="phone-screen">
+    <div class="demo-badge">DEMO</div>
+    <div class="toast" id="toast">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+      報告を全駅へ共有しました
+    </div>
+
+    <div class="app-scroll">
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+      <polyline points="10 9 9 9 8 9"/>
+    </svg>
+    <h1>現場メモ 一言報告</h1>
+  </div>
+  <div class="header-badge">豊橋鉄道 全駅共有</div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="showTab('report')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+    報告する
+  </button>
+  <button class="tab" onclick="showTab('timeline')">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6"/>
+      <line x1="8" y1="12" x2="21" y2="12"/>
+      <line x1="8" y1="18" x2="21" y2="18"/>
+      <line x1="3" y1="6" x2="3.01" y2="6"/>
+      <line x1="3" y1="12" x2="3.01" y2="12"/>
+      <line x1="3" y1="18" x2="3.01" y2="18"/>
+    </svg>
+    タイムライン
+  </button>
+</div>
+
+<!-- REPORT TAB -->
+<div class="tab-content active" id="tab-report">
+  <div class="report-tab">
+
+    <!-- CAMERA AREA -->
+    <div class="camera-area" id="camera-area">
+      <div class="camera-icon">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+      </div>
+      <div class="camera-text">タップして撮影</div>
+      <div class="camera-sub">下のシナリオを選んでお試しください</div>
+
+      <div class="camera-preview" id="camera-preview">
+        <div id="preview-content"></div>
+        <div class="preview-overlay">
+          <span class="preview-label">撮影済み</span>
+          <button class="retake-btn" onclick="retakePhoto(event)">撮り直す</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- シナリオ選択 -->
+    <div class="scenario-grid" id="scenario-grid">
+      <div class="scenario-header">DEMO シナリオを選択</div>
+      <div class="scenario-card lost" onclick="demoCapture('umbrella')">
+        <div class="sc-icon">☂️</div>
+        <div class="sc-label">忘れ物</div>
+        <div class="sc-sub">傘の忘れ物を発見</div>
+      </div>
+      <div class="scenario-card damage" onclick="demoCapture('bench')">
+        <div class="sc-icon">🪑</div>
+        <div class="sc-label">設備不良</div>
+        <div class="sc-sub">ベンチの破損を発見</div>
+      </div>
+      <div class="scenario-card light" onclick="demoCapture('light')">
+        <div class="sc-icon">💡</div>
+        <div class="sc-label">電球切れ</div>
+        <div class="sc-sub">照明の不具合を発見</div>
+      </div>
+      <div class="scenario-card suspicious" onclick="demoCapture('suspicious')">
+        <div class="sc-icon">⚠️</div>
+        <div class="sc-label">不審物</div>
+        <div class="sc-sub">不審な荷物を発見</div>
+      </div>
+    </div>
+
+    <!-- AI ANALYSIS -->
+    <div class="ai-analysis" id="ai-analysis">
+      <div class="ai-header">
+        <div class="ai-header-left">
+          <div class="ai-badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            AI解析
+          </div>
+          <span class="ai-status" id="ai-status">解析中...</span>
+        </div>
+      </div>
+      <div id="ai-loading" class="ai-loading">
+        <div class="ai-dots">
+          <div class="ai-dot"></div>
+          <div class="ai-dot"></div>
+          <div class="ai-dot"></div>
+        </div>
+        <span class="ai-loading-text">画像を解析しています...</span>
+      </div>
+      <div id="ai-results" style="display:none;"></div>
+    </div>
+
+    <!-- META -->
+    <div class="meta-section" id="meta-section">
+      <div class="meta-label">自動取得データ <span class="edit-hint">タップで修正可</span></div>
+      <div class="meta-row">
+        <div class="meta-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <input class="meta-text-input" id="meta-location" value="高師駅 2番ホーム付近">
+        <span class="meta-auto">GPS自動</span>
+      </div>
+      <div class="meta-row">
+        <div class="meta-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <input class="meta-text-input" id="meta-time" value="—">
+        <span class="meta-auto">自動記録</span>
+      </div>
+      <div class="meta-row">
+        <div class="meta-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <input class="meta-text-input" value="田中（駅員ID: TKR-042）">
+        <span class="meta-auto">ログイン情報</span>
+      </div>
+    </div>
+
+    <!-- NOTE -->
+    <div class="note-area" id="note-area">
+      <div class="meta-label">補足メモ（任意）</div>
+      <textarea class="note-input" placeholder="追加情報があれば入力..."></textarea>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitReport()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+      報告を送信する
+    </button>
+
+  </div>
+</div>
+
+<!-- TIMELINE TAB -->
+<div class="tab-content" id="tab-timeline">
+  <div class="timeline-tab">
+    <div class="timeline-filter">
+      <button class="filter-chip active" onclick="filterTimeline(this,'all')">すべて</button>
+      <button class="filter-chip" onclick="filterTimeline(this,'lost')">忘れ物</button>
+      <button class="filter-chip" onclick="filterTimeline(this,'damage')">設備不良</button>
+      <button class="filter-chip" onclick="filterTimeline(this,'urgent')">緊急</button>
+      <button class="filter-chip" onclick="filterTimeline(this,'mine')">自分の報告</button>
+    </div>
+
+    <div id="timeline-list">
+
+      <div class="timeline-card" data-type="urgent" data-mine="false">
+        <div class="tl-img-block urgent">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <div class="timeline-body">
+          <div class="timeline-top">
+            <div class="tl-badges">
+              <span class="timeline-category urgent">緊急</span>
+            </div>
+            <span class="timeline-time">15:08</span>
+          </div>
+          <div class="timeline-desc">置き去りにされた荷物 — 改札内</div>
+          <div class="timeline-meta">
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              新豊橋駅 改札内
+            </span>
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              山本
+            </span>
+          </div>
+          <div class="timeline-status">
+            <span class="status-dot urgent"></span>
+            <span style="color:#ef4444;font-weight:700;">警察連絡中</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-card" data-type="lost" data-mine="true">
+        <div class="tl-img-block lost">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 12a11.05 11.05 0 0 0-22 0zm-5 7a3 3 0 0 1-6 0v-7"/>
+          </svg>
+        </div>
+        <div class="timeline-body">
+          <div class="timeline-top">
+            <div class="tl-badges">
+              <span class="timeline-category lost">忘れ物</span>
+              <span class="tl-mine-badge">自分</span>
+            </div>
+            <span class="timeline-time">14:32</span>
+          </div>
+          <div class="timeline-desc">黒い折りたたみ傘</div>
+          <div class="timeline-meta">
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              高師駅 2番ホーム
+            </span>
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              田中
+            </span>
+          </div>
+          <div class="timeline-status">
+            <span class="status-dot pending"></span>
+            <span style="color:#f59e0b;">保管中 ・ 問い合わせ待ち</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-card" data-type="damage" data-mine="false">
+        <div class="tl-img-block damage">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="10" width="20" height="4" rx="1"/>
+            <line x1="5" y1="14" x2="5" y2="20"/>
+            <line x1="19" y1="14" x2="19" y2="20"/>
+            <line x1="2" y1="7" x2="22" y2="7"/>
+          </svg>
+        </div>
+        <div class="timeline-body">
+          <div class="timeline-top">
+            <span class="timeline-category damage">設備不良</span>
+            <span class="timeline-time">13:15</span>
+          </div>
+          <div class="timeline-desc">ベンチの座面 ひび割れ</div>
+          <div class="timeline-meta">
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              芦原駅 待合室
+            </span>
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              鈴木
+            </span>
+          </div>
+          <div class="timeline-status">
+            <span class="status-dot pending"></span>
+            <span style="color:#f59e0b;">修理依頼済み</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-card" data-type="damage" data-mine="false">
+        <div class="tl-img-block damage">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="2" x2="12" y2="6"/>
+            <path d="M12 6a6 6 0 0 1 6 6c0 4-6 10-6 10S6 16 6 12a6 6 0 0 1 6-6z"/>
+            <line x1="9" y1="20" x2="15" y2="20"/>
+          </svg>
+        </div>
+        <div class="timeline-body">
+          <div class="timeline-top">
+            <span class="timeline-category damage">設備不良</span>
+            <span class="timeline-time">11:48</span>
+          </div>
+          <div class="timeline-desc">ホーム照明 3番灯 不点灯</div>
+          <div class="timeline-meta">
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              植田駅 上りホーム
+            </span>
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              佐藤
+            </span>
+          </div>
+          <div class="timeline-status">
+            <span class="status-dot resolved"></span>
+            <span style="color:#22c55e;">交換完了</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-card" data-type="lost" data-mine="true">
+        <div class="tl-img-block lost">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <path d="M16 10a4 4 0 0 1-8 0"/>
+          </svg>
+        </div>
+        <div class="timeline-body">
+          <div class="timeline-top">
+            <div class="tl-badges">
+              <span class="timeline-category lost">忘れ物</span>
+              <span class="tl-mine-badge">自分</span>
+            </div>
+            <span class="timeline-time">10:22</span>
+          </div>
+          <div class="timeline-desc">茶色のトートバッグ（書籍入り）</div>
+          <div class="timeline-meta">
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              新豊橋駅 3号車内
+            </span>
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              田中
+            </span>
+          </div>
+          <div class="timeline-status">
+            <span class="status-dot resolved"></span>
+            <span style="color:#22c55e;">持ち主に返却済み</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline-card" data-type="lost" data-mine="false">
+        <div class="tl-img-block lost">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+            <line x1="12" y1="18" x2="12.01" y2="18"/>
+          </svg>
+        </div>
+        <div class="timeline-body">
+          <div class="timeline-top">
+            <span class="timeline-category lost">忘れ物</span>
+            <span class="timeline-time">09:05</span>
+          </div>
+          <div class="timeline-desc">白いスマートフォン（iPhoneケース付き）</div>
+          <div class="timeline-meta">
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              大清水駅 改札付近
+            </span>
+            <span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              加藤
+            </span>
+          </div>
+          <div class="timeline-status">
+            <span class="status-dot pending"></span>
+            <span style="color:#f59e0b;">保管中 ・ 問い合わせ待ち</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+    </div><!-- /.app-scroll -->
+  </div><!-- /.phone-screen -->
+  <div class="phone-home-bar"></div>
+</div><!-- /.phone-shell -->
+
+<script>
+// Tabs
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', ['report','timeline'][i] === name);
+  });
+}
+
+// Demo scenarios
+const scenarios = {
+  umbrella: {
+    category:'lost', categoryLabel:'忘れ物',
+    description:'黒い折りたたみ傘（ブランド不明）',
+    confidence:94, priority:'通常',
+    icon:'umbrella', location:'高師駅 2番ホーム付近'
+  },
+  bench: {
+    category:'damage', categoryLabel:'設備不良',
+    description:'ベンチの座面にひび割れを確認',
+    confidence:91, priority:'通常',
+    icon:'bench', location:'芦原駅 待合室'
+  },
+  light: {
+    category:'damage', categoryLabel:'設備不良',
+    description:'ホーム照明の不点灯（蛍光灯切れ）',
+    confidence:97, priority:'通常',
+    icon:'light', location:'植田駅 上りホーム'
+  },
+  suspicious: {
+    category:'urgent', categoryLabel:'緊急',
+    description:'置き去りにされた荷物を確認',
+    confidence:88, priority:'緊急対応',
+    icon:'warning', location:'新豊橋駅 改札内'
+  }
+};
+
+const previewIcons = {
+  umbrella:`<svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round"><path d="M23 12a11.05 11.05 0 0 0-22 0zm-5 7a3 3 0 0 1-6 0v-7"/></svg>`,
+  bench:`<svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="10" width="20" height="4" rx="1"/><line x1="5" y1="14" x2="5" y2="20"/><line x1="19" y1="14" x2="19" y2="20"/><line x1="2" y1="7" x2="22" y2="7"/></svg>`,
+  light:`<svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="1.5" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="6"/><path d="M12 6a6 6 0 0 1 6 6c0 4-6 10-6 10S6 16 6 12a6 6 0 0 1 6-6z"/><line x1="9" y1="20" x2="15" y2="20"/></svg>`,
+  warning:`<svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+};
+
+let currentScenario = null;
+
+function demoCapture(type, e) {
+  if(e) e.stopPropagation();
+  currentScenario = { ...scenarios[type], type };
+
+  // Preview
+  const preview = document.getElementById('camera-preview');
+  document.getElementById('preview-content').innerHTML =
+    `<div style="display:flex;align-items:center;justify-content:center;width:100%;height:200px;background:#111;">${previewIcons[currentScenario.icon]}</div>`;
+  preview.classList.add('show');
+  const demoImgs = document.getElementById('demo-images');
+  if(demoImgs) demoImgs.style.display = 'none';
+  const scenGrid = document.getElementById('scenario-grid');
+  if(scenGrid) scenGrid.style.display = 'none';
+
+  // Start AI analysis
+  const analysis = document.getElementById('ai-analysis');
+  analysis.classList.add('show');
+  document.getElementById('ai-loading').style.display = 'flex';
+  document.getElementById('ai-results').style.display = 'none';
+  document.getElementById('ai-status').textContent = '解析中...';
+
+  setTimeout(() => {
+    document.getElementById('ai-loading').style.display = 'none';
+    document.getElementById('ai-status').textContent = '解析完了';
+
+    const tagClass = currentScenario.category;
+    const pctColor = tagClass === 'urgent' ? '#ef4444' : tagClass === 'damage' ? '#f97316' : '#3b82f6';
+    const prio     = currentScenario.priority;
+    const prioStyle = prio === '緊急対応'
+      ? 'color:#ef4444;font-weight:700;'
+      : 'color:#334155;';
+
+    document.getElementById('ai-results').innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span class="meta-label" style="margin:0">AI解析結果</span>
+        <span class="edit-hint">タップで修正可</span>
+      </div>
+      <div class="ai-result-row">
+        <span class="ai-result-label">カテゴリ</span>
+        <input class="editable-field" value="${currentScenario.categoryLabel}" style="color:${tagClass==='urgent'?'#991b1b':tagClass==='damage'?'#9a3412':'#1e40af'}">
+      </div>
+      <div class="ai-result-row">
+        <span class="ai-result-label">状況・物体</span>
+        <input class="editable-field" value="${currentScenario.description}">
+      </div>
+      <div class="ai-result-row">
+        <span class="ai-result-label">優先度</span>
+        <input class="editable-field" value="${prio}" style="${prioStyle}">
+      </div>
+      <div class="ai-result-row" style="align-items:center;">
+        <span class="ai-result-label">確信度</span>
+        <div class="confidence-bar-wrap">
+          <div class="confidence-bar-track">
+            <div class="confidence-bar-fill" id="conf-bar" style="width:0%;background:linear-gradient(90deg,${pctColor},${pctColor}aa);"></div>
+          </div>
+        </div>
+        <span class="confidence-pct">${currentScenario.confidence}%</span>
+      </div>
+    `;
+    document.getElementById('ai-results').style.display = 'block';
+
+    // Animate confidence bar
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const bar = document.getElementById('conf-bar');
+        if (bar) bar.style.width = currentScenario.confidence + '%';
+      }, 50);
+    });
+
+    // Show meta
+    const now = new Date();
+    document.getElementById('meta-time').value =
+      `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ` +
+      `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    document.getElementById('meta-location').value = currentScenario.location;
+
+    document.getElementById('meta-section').classList.add('show');
+    document.getElementById('note-area').classList.add('show');
+    document.getElementById('submit-btn').classList.add('show');
+  }, 2000);
+}
+
+function retakePhoto(e) {
+  e.stopPropagation();
+  document.getElementById('camera-preview').classList.remove('show');
+  const demoImgs2 = document.getElementById('demo-images');
+  if(demoImgs2) demoImgs2.style.display = 'flex';
+  const scenGrid2 = document.getElementById('scenario-grid');
+  if(scenGrid2) scenGrid2.style.display = 'grid';
+  document.getElementById('ai-analysis').classList.remove('show');
+  document.getElementById('meta-section').classList.remove('show');
+  document.getElementById('note-area').classList.remove('show');
+  document.getElementById('submit-btn').classList.remove('show');
+  currentScenario = null;
+}
+
+function submitReport() {
+  if (!currentScenario) return;
+  const now  = new Date();
+  const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const tagClass = currentScenario.category;
+
+  const card = document.createElement('div');
+  card.className = 'timeline-card';
+  card.setAttribute('data-type', tagClass);
+  card.setAttribute('data-mine', 'true');
+
+  const iconMap = {
+    lost: previewIcons.umbrella,
+    damage: previewIcons.bench,
+    urgent: previewIcons.warning
+  };
+  const bgMap = { lost:'lost', damage:'damage', urgent:'urgent' };
+
+  card.innerHTML = `
+    <div class="tl-img-block ${bgMap[tagClass]}">${iconMap[tagClass]?.replace('width="72" height="72"','width="48" height="48"') || ''}</div>
+    <div class="timeline-body">
+      <div class="timeline-top">
+        <div class="tl-badges">
+          <span class="timeline-category ${tagClass}">${currentScenario.categoryLabel}</span>
+          <span class="tl-mine-badge">自分</span>
+        </div>
+        <span class="timeline-time">${time}</span>
+      </div>
+      <div class="timeline-desc">${currentScenario.description}</div>
+      <div class="timeline-meta">
+        <span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          ${currentScenario.location}
+        </span>
+        <span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          田中
+        </span>
+      </div>
+      <div class="timeline-status">
+        <span class="status-dot ${tagClass === 'urgent' ? 'urgent' : 'pending'}"></span>
+        <span style="color:${tagClass === 'urgent' ? '#ef4444' : '#f59e0b'};">新規報告${tagClass === 'urgent' ? ' ・ 緊急対応中' : ''}</span>
+      </div>
+    </div>`;
+
+  const list = document.getElementById('timeline-list');
+  list.insertBefore(card, list.firstChild);
+
+  // Toast
+  const toast = document.getElementById('toast');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2800);
+
+  retakePhoto(new Event('click'));
+  setTimeout(() => showTab('timeline'), 500);
+}
+
+// Filter
+function filterTimeline(el, type) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.timeline-card').forEach(card => {
+    const cardType = card.getAttribute('data-type');
+    const isMine   = card.getAttribute('data-mine') === 'true';
+    if (type === 'all') {
+      card.style.display = '';
+    } else if (type === 'mine') {
+      card.style.display = isMine ? '' : 'none';
+    } else {
+      card.style.display = cardType === type ? '' : 'none';
+    }
+  });
+}
+</script>
+
+</body>
+</html>
